@@ -17,6 +17,8 @@ generate gif for custom code with gif background image
 
 ## Features
 
+![](https://github.com/hongeSunCoder/fun_qr_generator/blob/main/example/template_qr.jpg)
+
 ![](./example/template_qr.jpg)
 ![](./example/gif_qr.GIF)
 
@@ -49,7 +51,5 @@ String gifPath = await FunQr().generatePathWithGif(
 
           
 ```
-
-## Additional information
 
 
