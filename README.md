@@ -11,8 +11,9 @@ and the Flutter guide for
 [developing packages and plugins](https://flutter.dev/developing-packages).
 -->
 
-generate gif image path for custom code with gif background
-add custom code in widget tree
+generate gif for custom code with gif background image
+
+// display custom code in widget tree
 
 ## Features
 
@@ -27,7 +28,6 @@ add custom code in widget tree
 
 
 ```dart
-const like = 'sample';
 
 // use custom qr in widget tree
 Container(
