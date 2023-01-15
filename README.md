@@ -17,8 +17,8 @@ generate gif for custom code with gif background image
 
 ## Features
 
-![](./example/template_qr.jpg)
-![](./example/gif_qr.GIF)
+![](https://github.com/hongeSunCoder/fun_qr_generator/blob/main/example/template_qr.jpg)
+![](https://github.com/hongeSunCoder/fun_qr_generator/blob/main/example/gif_qr.GIF)
 
 ## Getting started
 
