@@ -50,6 +50,4 @@ String gifPath = await FunQr().generatePathWithGif(
           
 ```
 
-## Additional information
-
 
