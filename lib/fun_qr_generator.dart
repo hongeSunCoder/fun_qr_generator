@@ -37,7 +37,7 @@ class FunQr {
     return result['isSuccess'] ?? false;
   }
 
-  Future<ui.Image> generate({String data = '', ui.Image? bgImage}) async {
+  Future<ui.Image> generateImage({String data = '', ui.Image? bgImage}) async {
     ui.PictureRecorder recorder = ui.PictureRecorder();
 
     Canvas canvas = Canvas(recorder);

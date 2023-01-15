@@ -1,7 +1,7 @@
 name: fun_qr_generator
-description: A new Flutter package project.
+description: To generate custom qr image with gif background.
 version: 0.0.1
-homepage:
+homepage: https://github.com/hongeSunCoder/fun_qr_generator
 
 environment:
   sdk: '>=2.18.4 <3.0.0'
