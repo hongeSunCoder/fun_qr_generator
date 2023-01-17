@@ -1,3 +1,7 @@
 ## 0.0.1
 
-* TODO: Describe initial release.
+* init
+
+## 0.0.3
+
+* move gif generate to isolate
