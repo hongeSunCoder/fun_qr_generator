@@ -1,13 +1,13 @@
 library fun_qr_generator;
 
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:custom_qr_generator/custom_qr_generator.dart';
 import 'package:flutter/services.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:zxing_lib/qrcode.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -21,29 +21,33 @@ class FunQr {
     return _instance!;
   }
 
-  static QrOptions defaultOptions = _defaultQrOptions;
+  // Future<bool> saveGalleryForGifCode(String data, String gifUrl) async {
+  //   var gifPath = await generatePath(data: data, gifUrl: gifUrl);
 
-  Future<bool> saveGalleryForGifCode(String data, String gifUrl) async {
-    var gifPath = await generatePathWithGif(data: data, gifUrl: gifUrl);
+  //   var result = await ImageGallerySaver.saveFile(gifPath,
+  //       name: "gif_qr_${DateTime.now().millisecondsSinceEpoch}.gif",
+  //       isReturnPathOfIOS: true);
 
-    var result = await ImageGallerySaver.saveFile(gifPath,
-        name: "gif_qr_${DateTime.now().millisecondsSinceEpoch}.gif",
-        isReturnPathOfIOS: true);
+  //   if (result is Map && result["errorMessage"] != null) {
+  //     print(result["errorMessage"]);
+  //   }
 
-    if (result is Map && result["errorMessage"] != null) {
-      print(result["errorMessage"]);
-    }
+  //   return result['isSuccess'] ?? false;
+  // }
 
-    return result['isSuccess'] ?? false;
-  }
-
-  Future<ui.Image> generateImage({String data = '', ui.Image? bgImage}) async {
+  Future<ui.Image> generateImage(
+      {String data = '',
+      ui.Image? bgImage,
+      QrOptions qrOptions = _defaultQrOptions}) async {
     ui.PictureRecorder recorder = ui.PictureRecorder();
 
     Canvas canvas = Canvas(recorder);
 
-    FunQrPainter(data: data, options: _defaultQrOptions, backgroundImg: bgImage)
-        .paint(canvas, const Size(500, 500));
+    FunQrPainter(data: data, options: qrOptions, backgroundImg: bgImage).paint(
+        canvas,
+        bgImage != null
+            ? Size(bgImage.width.toDouble(), bgImage.height.toDouble())
+            : const Size(500, 500));
 
     ui.Picture picture = recorder.endRecording();
 
@@ -54,13 +58,13 @@ class FunQr {
     return image;
   }
 
-  Future<ByteData?> generateByte(String data, ui.Image bgImage) async {
+  Future<ByteData?> generateByte(String data, ui.Image bgImage,
+      {QrOptions qrOptions = _defaultQrOptions}) async {
     ui.PictureRecorder recorder = ui.PictureRecorder();
     Canvas canvas = Canvas(recorder);
 
-    FunQrPainter(data: data, options: _defaultQrOptions, backgroundImg: bgImage)
-        .paint(
-            canvas, Size(bgImage.width.toDouble(), bgImage.height.toDouble()));
+    FunQrPainter(data: data, options: qrOptions, backgroundImg: bgImage).paint(
+        canvas, Size(bgImage.width.toDouble(), bgImage.height.toDouble()));
 
     ui.Picture picture = recorder.endRecording();
 
@@ -69,10 +73,10 @@ class FunQr {
     return await image.toByteData(format: ui.ImageByteFormat.png);
   }
 
-  Future<String> generatePathWithGif(
-      {String? data = '', String gifUrl = ''}) async {
-    // var gifUrl = "https://r.pandoradate.com/qr/GIF/fireworks.gif";
-
+  Future<String> generatePath(
+      {String? data = '',
+      String gifUrl = '',
+      QrOptions qrOptions = _defaultQrOptions}) async {
     final url = Uri.parse(gifUrl);
     final ByteData byteData = await NetworkAssetBundle(url).load(url.path);
 
@@ -86,17 +90,18 @@ class FunQr {
       // Get the next frame
       final ui.FrameInfo fi = await codec.getNextFrame();
 
-      var bgImageCodeByte = await generateByte(data!, fi.image);
+      var bgImageCodeByte =
+          await generateByte(data!, fi.image, qrOptions: qrOptions);
       if (bgImageCodeByte != null) {
         bgImageCodes.add(bgImageCodeByte);
       }
     }
 
-    print("total $frameCount frame");
+    // print("total $frameCount frame");
 
     var gifPath =
         "${(await getTemporaryDirectory()).path}/fun_qr_${DateTime.now().millisecondsSinceEpoch}.gif";
-    List<int>? combineGif = await generateGif(bgImageCodes);
+    List<int>? combineGif = await _generateGifWithIsolate(bgImageCodes);
     if (combineGif != null) {
       File gifFile = await File(gifPath).writeAsBytes(combineGif);
     }
@@ -104,34 +109,45 @@ class FunQr {
     return gifPath;
   }
 
-  Future<List<int>?> generateGif(List<ByteData> dataList) async {
-    final img.PngDecoder decoder = img.PngDecoder();
+  Future<List<int>?> _generateGifWithIsolate(List<ByteData> imageDatas) async {
+    final mainReceivePort = ReceivePort();
 
-    final img.Animation animation = img.Animation();
+    Isolate.spawn<List>((List mainMessage) async {
+      final img.PngDecoder decoder = img.PngDecoder();
 
-    for (var imgByte in dataList) {
-      img.Image image = decoder.decodeImage(imgByte.buffer.asUint8List())!;
-      animation.addFrame(image);
-    }
+      final img.Animation animation = img.Animation();
 
-    List<int>? gif = img.encodeGifAnimation(animation, samplingFactor: 50);
-    return gif;
+      for (var imgByte in mainMessage.last) {
+        img.Image image = decoder.decodeImage(imgByte.buffer.asUint8List())!;
+
+        img.encodeGif(image);
+        animation.addFrame(image);
+      }
+
+      List<int>? combineGif = img.encodeGifAnimation(animation);
+
+      SendPort sendToMainPort = mainMessage.first;
+
+      sendToMainPort.send(combineGif);
+    }, [mainReceivePort.sendPort, imageDatas]);
+
+    return await mainReceivePort.first;
   }
 }
 
-QrOptions _defaultQrOptions = QrOptions(
+const QrOptions _defaultQrOptions = QrOptions(
     padding: 0,
-    shapes: const QrShapes(
+    shapes: QrShapes(
         lightPixel: QrPixelShapeCircle(radiusFraction: 0.6),
         darkPixel: QrPixelShapeCircle(radiusFraction: 0.6),
         frame: QrFrameShapeDefault(),
         ball: QrBallShapeDefault()),
     colors: QrColors(
-        background: const QrColorSolid(Colors.transparent),
-        frame: const QrColorSolid(Colors.black),
-        ball: const QrColorSolid(Colors.black),
-        dark: const QrColorSolid(Colors.black),
-        light: QrColorSolid(Colors.white.withOpacity(0.6))));
+        background: QrColorSolid(Colors.transparent),
+        frame: QrColorSolid(Colors.black),
+        ball: QrColorSolid(Colors.black),
+        dark: QrColorSolid(Colors.black),
+        light: QrColorSolid(Colors.white60)));
 
 class FunQrPainter extends CustomPainter {
   final String data;

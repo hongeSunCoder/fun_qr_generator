@@ -44,7 +44,7 @@ Container(
 
 
 // use the temp gif path to save gallery or do other things
-String gifPath = await FunQr().generatePathWithGif(
+String gifPath = await FunQr().generatePath(
               data: "qr content", gifUrl: "https://yourgif.gif");
 
           
