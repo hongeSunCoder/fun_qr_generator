@@ -73,6 +73,50 @@ class FunQr {
     return await image.toByteData(format: ui.ImageByteFormat.png);
   }
 
+
+  Future<String> generatePathWithBytes({
+    String? data, 
+    required Uint8List bytes, 
+    QrOptions qrOptions = _defaultQrOptions}) async {
+    final ui.Codec codec =
+        await ui.instantiateImageCodec(bytes);
+
+    final int frameCount = codec.frameCount;
+
+    final List<ByteData> bgImageCodes = [];
+    for (int i = 0; i < frameCount; i++) {
+      // Get the next frame
+      final ui.FrameInfo fi = await codec.getNextFrame();
+
+      var bgImageCodeByte =
+          await generateByte(data!, fi.image, qrOptions: qrOptions);
+      if (bgImageCodeByte != null) {
+        bgImageCodes.add(bgImageCodeByte);
+      }
+    }
+
+    // print("total $frameCount frame");
+
+    var resultPath =
+        "${(await getTemporaryDirectory()).path}/fun_qr_${DateTime.now().millisecondsSinceEpoch}.${bgImageCodes.length > 1 ? 'gif':'png'}";
+
+    
+    List<int>? resultBytes; 
+    
+    if (bgImageCodes.length > 1) {
+      resultBytes = await _generateGifWithIsolate(bgImageCodes);
+    }
+    else if (bgImageCodes.length == 1) {
+      resultBytes = bgImageCodes.first.buffer.asUint8List();
+    }
+    
+    if (resultBytes != null) {
+      File gifFile = await File(resultPath).writeAsBytes(resultBytes);
+    }
+
+    return resultPath;
+  }
+
   Future<String> generatePath(
       {String? data = '',
       String gifUrl = '',
