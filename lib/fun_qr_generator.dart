@@ -35,35 +35,36 @@ class FunQr {
   //   return result['isSuccess'] ?? false;
   // }
 
-  Future<ui.Image> generateImage(
-      {String data = '',
-      ui.Image? bgImage,
-      QrOptions qrOptions = _defaultQrOptions}) async {
-    ui.PictureRecorder recorder = ui.PictureRecorder();
+  // Future<ui.Image> generateImage(
+  //     {String data = '',
+  //     ui.Image? bgImage,
+  //     QrOptions qrOptions = _defaultQrOptions}) async {
+  //   ui.PictureRecorder recorder = ui.PictureRecorder();
 
-    Canvas canvas = Canvas(recorder);
+  //   Canvas canvas = Canvas(recorder);
 
-    FunQrPainter(data: data, options: qrOptions, backgroundImg: bgImage).paint(
-        canvas,
-        bgImage != null
-            ? Size(bgImage.width.toDouble(), bgImage.height.toDouble())
-            : const Size(500, 500));
+  //   FunQrPainter(data: data, options: qrOptions, backgroundImg: bgImage).paint(
+  //       canvas,
+  //       bgImage != null
+  //           ? Size(bgImage.width.toDouble(), bgImage.height.toDouble())
+  //           : const Size(500, 500));
 
-    ui.Picture picture = recorder.endRecording();
+  //   ui.Picture picture = recorder.endRecording();
 
-    int imageWidth = bgImage != null ? bgImage.width : 200;
-    int imageHeight = bgImage != null ? bgImage.height : 200;
-    ui.Image image = await picture.toImage(imageWidth, imageHeight);
+  //   int imageWidth = bgImage != null ? bgImage.width : 200;
+  //   int imageHeight = bgImage != null ? bgImage.height : 200;
+  //   ui.Image image = await picture.toImage(imageWidth, imageHeight);
 
-    return image;
-  }
+  //   return image;
+  // }
 
+  // patin code with bg image
   Future<ByteData?> generateByte(String data, ui.Image bgImage,
-      {QrOptions qrOptions = _defaultQrOptions}) async {
+      {QrOptions qrOptions = _defaultQrOptions, double bgImgPaddingScale = 0}) async {
     ui.PictureRecorder recorder = ui.PictureRecorder();
     Canvas canvas = Canvas(recorder);
 
-    FunQrPainter(data: data, options: qrOptions, backgroundImg: bgImage).paint(
+    FunQrPainter(data: data, options: qrOptions, backgroundImg: bgImage, bgImgPaddingScale: bgImgPaddingScale).paint(
         canvas, Size(bgImage.width.toDouble(), bgImage.height.toDouble()));
 
     ui.Picture picture = recorder.endRecording();
@@ -77,6 +78,7 @@ class FunQr {
   Future<String> generatePathWithBytes({
     String? data, 
     required Uint8List bytes, 
+    double bgImgPaddingScale = 0,
     QrOptions qrOptions = _defaultQrOptions}) async {
     final ui.Codec codec =
         await ui.instantiateImageCodec(bytes);
@@ -89,7 +91,7 @@ class FunQr {
       final ui.FrameInfo fi = await codec.getNextFrame();
 
       var bgImageCodeByte =
-          await generateByte(data!, fi.image, qrOptions: qrOptions);
+          await generateByte(data!, fi.image, bgImgPaddingScale: bgImgPaddingScale, qrOptions: qrOptions);
       if (bgImageCodeByte != null) {
         bgImageCodes.add(bgImageCodeByte);
       }
@@ -180,14 +182,14 @@ class FunQr {
 }
 
 const QrOptions _defaultQrOptions = QrOptions(
-    padding: 0,
+    padding: 0.1,
     shapes: QrShapes(
         lightPixel: QrPixelShapeCircle(radiusFraction: 0.6),
         darkPixel: QrPixelShapeCircle(radiusFraction: 0.6),
         frame: QrFrameShapeDefault(),
         ball: QrBallShapeDefault()),
     colors: QrColors(
-        background: QrColorSolid(Colors.transparent),
+        background: QrColorSolid(Colors.white),
         frame: QrColorSolid(Colors.black),
         ball: QrColorSolid(Colors.black),
         dark: QrColorSolid(Colors.black),
@@ -199,9 +201,10 @@ class FunQrPainter extends CustomPainter {
   late ByteMatrix matrix;
 
   ui.Image? backgroundImg;
+  double bgImgPaddingScale;
 
   FunQrPainter(
-      {required this.data, required this.options, this.backgroundImg}) {
+      {required this.data, required this.options, this.backgroundImg, this.bgImgPaddingScale = 0}) {
     matrix = Encoder.encode(data, options.ecl).matrix!;
 
     var width = matrix.width ~/ 4;
@@ -217,19 +220,19 @@ class FunQrPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final codeSize = min(size.width, size.height);
+    final padding = codeSize * options.padding / 2;
+    
 
+    final bgImageSize = codeSize - padding * 2;
+    double bgImgPadding = 0;
     if (backgroundImg != null) {
-      canvas.drawImageRect(
-          backgroundImg!,
-          Rect.fromLTWH(0, 0, backgroundImg!.width.toDouble(),
-              backgroundImg!.height.toDouble()),
-          Rect.fromLTWH(0, 0, codeSize, codeSize),
-          Paint());
+      bgImgPadding = bgImageSize * bgImgPaddingScale / 2;
     }
 
-    final padding = codeSize * options.padding / 2;
-    final pixelSize = (codeSize - 2 * padding) / matrix.width;
-    final realCodeSize = codeSize - padding * 2;
+
+    final realCodeSize = bgImageSize - bgImgPadding * 2;
+    final pixelSize = (bgImageSize - 2 * bgImgPadding) / matrix.width;
+
     final lightPaint =
         options.colors.light.createPaint(realCodeSize, realCodeSize);
     final darkPaint =
@@ -255,8 +258,21 @@ class FunQrPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height),
         options.colors.background.createPaint(size.width, size.height));
 
+
+    if (backgroundImg != null) {
+      canvas.drawImageRect(
+          backgroundImg!,
+          Rect.fromLTWH(0, 0, backgroundImg!.width.toDouble(),
+              backgroundImg!.height.toDouble()),
+          Rect.fromLTWH(padding, padding, bgImageSize, bgImageSize),
+          Paint());
+    }
+
+
     canvas.save();
-    canvas.translate(padding, padding);
+    canvas.translate(padding+bgImgPadding, padding+bgImgPadding);
+
+    
 
     void drawFrame(double dx, double dy) {
       if (options.colors.frame is! QrColorUnspecified) {
@@ -285,6 +301,7 @@ class FunQrPainter extends CustomPainter {
         canvas.drawPath(path, darkPaint);
       }
     }
+
 
     drawFrame(0, 0);
     drawBall(pixelSize * 2, pixelSize * 2);
